@@ -74,31 +74,31 @@ class MainActivity : AppCompatActivity() {
         val startTime = calendar.timeInMillis
         val endTime = System.currentTimeMillis()
 
-        val statsList = usageStatsManager.queryUsageStats(
-            UsageStatsManager.INTERVAL_DAILY, startTime, endTime
-        )
+        // Aggregated per package, so each app appears once with its total for today
+        val statsMap = usageStatsManager.queryAndAggregateUsageStats(startTime, endTime)
 
         val pm = packageManager
         var totalMs = 0L
 
-        val usageList = statsList
+        val usageList = statsMap.values
             .filter { it.totalTimeInForeground > 0 }
-            .mapNotNull { stat ->
+            .map { stat ->
+                var label = stat.packageName
+                var icon: android.graphics.drawable.Drawable? = null
                 try {
                     val appInfo: ApplicationInfo = pm.getApplicationInfo(stat.packageName, 0)
-                    // Skip our own app and system launcher-less background packages if desired
-                    val label = pm.getApplicationLabel(appInfo).toString()
-                    val icon = pm.getApplicationIcon(appInfo)
-                    totalMs += stat.totalTimeInForeground
-                    AppUsageInfo(
-                        appName = label,
-                        packageName = stat.packageName,
-                        icon = icon,
-                        totalTimeMs = stat.totalTimeInForeground
-                    )
+                    label = pm.getApplicationLabel(appInfo).toString()
+                    icon = pm.getApplicationIcon(appInfo)
                 } catch (e: PackageManager.NameNotFoundException) {
-                    null
+                    // Keep the entry, just show the package name instead
                 }
+                totalMs += stat.totalTimeInForeground
+                AppUsageInfo(
+                    appName = label,
+                    packageName = stat.packageName,
+                    icon = icon,
+                    totalTimeMs = stat.totalTimeInForeground
+                )
             }
             .sortedByDescending { it.totalTimeMs }
 
